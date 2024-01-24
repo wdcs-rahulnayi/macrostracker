@@ -30,19 +30,23 @@ const login = async (req,res)=>{
     if(!(await user.comparePassword(password))){
         throw new CustomErrors.UnauthenticatedError('Invalid Password');
     }
-
+    
     const tokenUser = createTokenUser(user);
+    console.log(tokenUser)
     attachCookiesToResponse({res, user:tokenUser});
     res.status(StatusCodes.OK).json({user:tokenUser});
 }
 
-const logout = async (req,res)=>{
-    res.cookie('token','logout',{
-        httpOnly:true,
-        expires:new Date(Date.now())
-    })
-    res.status(StatusCodes.OK).json({msg:'User logged out.'});
-}
+const logout = async (req, res) => {
+    // Clear the 'token' cookie on the server side
+    res.cookie('token', 'logout', {
+      httpOnly: true,
+      expires: new Date(0), // Set the expiration date to the past to clear the cookie
+    });
+  
+    res.status(StatusCodes.OK).json({ msg: 'User logged out.' });
+  };
+  
 
 module.exports = {
     register,

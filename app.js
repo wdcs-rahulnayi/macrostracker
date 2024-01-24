@@ -14,7 +14,10 @@ app.use(express.json());
 app.use(cookieParser(process.env.JWT_SECRET));
 app.use(express.static('./public'));
 app.use(fileUpload());
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+  }));
 
 const authRouter = require('./routes/authRoutes');
 const macrosRouter = require('./routes/macrosRoutes');
