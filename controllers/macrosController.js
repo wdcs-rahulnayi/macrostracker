@@ -45,17 +45,24 @@ const createMacros = async (req, res) => {
   try {
     const { date, meals } = req.body;
 
-    if(!date){
-      return res.status(StatusCodes.BAD_REQUEST).json({error:'Please enter the date'})
+    if (!date) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ error: 'Please enter the date' })
     }
     if (!meals || !Array.isArray(meals) || meals.length === 0) {
       return res.status(StatusCodes.BAD_REQUEST).json({ error: "Invalid request body" });
     }
 
-    
+
     const mealTypes = new Set();
     for (const meal of meals) {
-      if (!meal.name || !meal.protein || !meal.carbs || !meal.fats || !meal.fibres || !meal.calories) {
+      if (
+        !meal.name ||
+        meal.protein <= 0 ||
+        meal.carbs <= 0 ||
+        meal.fats <= 0 ||
+        meal.fibres <= 0 ||
+        meal.calories <= 0
+      ) {
         return res.status(StatusCodes.BAD_REQUEST).json({ error: "Invalid meal data" });
       }
 
@@ -76,59 +83,70 @@ const createMacros = async (req, res) => {
 
     res.status(StatusCodes.CREATED).json(macro);
   } catch (error) {
-    console.error("Error creating macros:", error);
+    console.error("Error in creating macros:", error);
 
     if (error.code === 11000 || error.code === 11001) {
-      // MongoDB duplicate key error (11000 for versions before 3.2, 11001 for versions after)
+
       res.status(StatusCodes.BAD_REQUEST).json({ error: "Data for the given date already exists" });
     } else {
-      // Other internal server errors
+
       res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ error: "Internal server error" });
     }
   }
 };
 
-  
-  
-  
+
+
+
 const updateMacros = async (req, res) => {
+  try {
     const updateFields = req.body;
-  
-    try {
-      const existingMacro = await Macro.findOne({ _id: req.params.id, user: req.user.userId });
-  
-      if (!existingMacro) {
-        throw new NotFoundError('Macros with provided id not found');
-      }
-  
-      // Update a specific meal within the meals array
-      const mealToUpdate = updateFields.meals.find(updatedMeal => {
-        return existingMacro.meals.some(existingMeal => existingMeal.name === updatedMeal.name);
-      });
-  
-      if (mealToUpdate) {
-        existingMacro.meals = existingMacro.meals.map(existingMeal => {
-          if (existingMeal.name === mealToUpdate.name) {
-            existingMeal.protein = mealToUpdate.protein || existingMeal.protein;
-            existingMeal.carbs = mealToUpdate.carbs || existingMeal.carbs;
-            existingMeal.fats = mealToUpdate.fats || existingMeal.fats;
-            existingMeal.fibres = mealToUpdate.fibres || existingMeal.fibres;
-            existingMeal.calories = mealToUpdate.calories || existingMeal.calories;
-          }
-          return existingMeal;
-        });
-  
-        // Save the updated Macro document
-        const savedMacro = await existingMacro.save();
-        res.status(StatusCodes.OK).json({ macro: savedMacro });
-      } else {
-        res.status(StatusCodes.NOT_FOUND).json({ message: 'Meal not found in the update request' });
-      }
-    } catch (error) {
-      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    const existingMacro = await Macro.findOne({ _id: req.params.id, user: req.user.userId });
+
+    if (!existingMacro) {
+      return res.status(StatusCodes.NOT_FOUND).json({ message: 'Macros with provided id not found' });
     }
-  };
-  
+
+    if (!updateFields.meals || !Array.isArray(updateFields.meals)) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Invalid data, missing meals array' });
+    }
+
+    updateFields.meals.forEach(updatedMeal => {
+      const existingMealIndex = existingMacro.meals.findIndex(existingMeal => existingMeal.name === updatedMeal.name);
+
+      if (existingMealIndex !== -1) {
+        const existingMeal = existingMacro.meals[existingMealIndex];
+
+        // Check for positive values
+        if (
+          updatedMeal.protein <= 0 ||
+          updatedMeal.carbs <= 0 ||
+          updatedMeal.fats <= 0 ||
+          updatedMeal.fibres <= 0 ||
+          updatedMeal.calories <= 0
+        ) {
+          return res.status(StatusCodes.BAD_REQUEST).json({ error: 'Invalid updated meal data - positive values required' });
+        }
+
+        existingMeal.protein = updatedMeal.protein || existingMeal.protein;
+        existingMeal.carbs = updatedMeal.carbs || existingMeal.carbs;
+        existingMeal.fats = updatedMeal.fats || existingMeal.fats;
+        existingMeal.fibres = updatedMeal.fibres || existingMeal.fibres;
+        existingMeal.calories = updatedMeal.calories || existingMeal.calories;
+
+        existingMacro.meals[existingMealIndex] = existingMeal;
+      }
+    });
+
+    // Save the updated Macro document
+    const savedMacro = await existingMacro.save();
+    res.status(StatusCodes.OK).json({ macro: savedMacro });
+  } catch (error) {
+    console.error('Error updating macros:', error);
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Internal Server Error' });
+  }
+};
+
 
 
 const deleteMacros = async (req, res) => {
