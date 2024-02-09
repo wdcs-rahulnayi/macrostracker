@@ -9,7 +9,6 @@ const UserSchema = new mongoose.Schema({
         minlength:3,
         maxlength:50
     },
-    //just testing commits to revert pull requests
     email:{
         type:String,
         required:[true, 'Please provide email'],
